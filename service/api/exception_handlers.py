@@ -2,6 +2,7 @@ from typing import Union
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from service.api.exceptions import UserNotFoundError, ModelNotFoundError
 from pydantic import ValidationError
 from starlette import status
 from starlette.exceptions import HTTPException
@@ -48,6 +49,38 @@ async def validation_error_handler(
     ]
     app_logger.error(str(errors))
     return create_response(status.HTTP_422_UNPROCESSABLE_ENTITY, errors=errors)
+
+
+async def user_not_found_error_handler(
+        request: Request,
+        exc: Union[RequestValidationError, UserNotFoundError]
+) -> JSONResponse:
+    errors = [
+        Error(
+            error_key=err.get("type"),
+            error_message=err.get("msg"),
+            error_loc=err.get("loc"),
+        )
+        for err in exc.errors()
+    ]
+    app_logger.error(str(errors))
+    return create_response(status.HTTP_404_NOT_FOUND, errors=errors)
+
+
+async def model_not_found_error_handler(
+        request: Request,
+        exc: Union[RequestValidationError, ModelNotFoundError]
+) -> JSONResponse:
+    errors = [
+        Error(
+            error_key=err.get("type"),
+            error_message=err.get("msg"),
+            error_loc=err.get("loc"),
+        )
+        for err in exc.errors()
+    ]
+    app_logger.error(str(errors))
+    return create_response(status.HTTP_404_NOT_FOUND, errors=errors)
 
 
 async def app_exception_handler(

@@ -67,3 +67,14 @@ venv.bak/
 .mypy_cache/
 
 
+!/.venv/
+
+!/.pytest_cache/
+
+!/.env
+
+#data
+/service/data/kion_train.zip
+/service/data/kion_train/
+/.venv/
+/.env
