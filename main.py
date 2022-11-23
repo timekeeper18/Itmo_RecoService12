@@ -10,6 +10,7 @@ app = create_app(config)
 
 if __name__ == "__main__":
     # uvicorn main:app
+    # cloudflared tunnel --url http://localhost:8000
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8080"))
 

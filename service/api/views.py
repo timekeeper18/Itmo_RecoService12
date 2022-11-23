@@ -21,7 +21,7 @@ class RecoResponse(BaseModel):
 
 
 router = APIRouter()
-SECRET_TOKEN = environ.get('SECRET_TOKEN')
+SECRET_TOKEN = environ.get("SECRET_TOKEN")
 API_KEY_NAME = "SECRET_TOKEN"
 
 if SECRET_TOKEN is None:
@@ -88,7 +88,7 @@ async def get_reco(
     k_recs = request.app.state.k_recs
 
     # формируем массив с рекомендациями
-    rec = list(items[items.index == user_id]['item_id'])
+    rec = items[items.index == user_id]["item_id"].values
     # проверяем на пустой результат
     if len(rec) == 0:
         rec = sample(item_list, k=k_recs)
@@ -97,9 +97,7 @@ async def get_reco(
         if len(rec) < k_recs:
             rec.extend(
                 sample(list(set(item_list) - set(rec)), k=k_recs - len(rec)))
-
-    sorted_reco_list = sorted(rec)
-    return RecoResponse(user_id=user_id, items=list(sorted_reco_list))
+    return RecoResponse(user_id=user_id, items=rec)
 
 
 def add_views(app: FastAPI) -> None:

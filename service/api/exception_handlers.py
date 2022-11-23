@@ -51,38 +51,6 @@ async def validation_error_handler(
     return create_response(status.HTTP_422_UNPROCESSABLE_ENTITY, errors=errors)
 
 
-async def user_not_found_error_handler(
-        request: Request,
-        exc: Union[RequestValidationError, UserNotFoundError]
-) -> JSONResponse:
-    errors = [
-        Error(
-            error_key=err.get("type"),
-            error_message=err.get("msg"),
-            error_loc=err.get("loc"),
-        )
-        for err in exc.errors()
-    ]
-    app_logger.error(str(errors))
-    return create_response(status.HTTP_404_NOT_FOUND, errors=errors)
-
-
-async def model_not_found_error_handler(
-        request: Request,
-        exc: Union[RequestValidationError, ModelNotFoundError]
-) -> JSONResponse:
-    errors = [
-        Error(
-            error_key=err.get("type"),
-            error_message=err.get("msg"),
-            error_loc=err.get("loc"),
-        )
-        for err in exc.errors()
-    ]
-    app_logger.error(str(errors))
-    return create_response(status.HTTP_404_NOT_FOUND, errors=errors)
-
-
 async def app_exception_handler(
     request: Request,
     exc: AppException,
