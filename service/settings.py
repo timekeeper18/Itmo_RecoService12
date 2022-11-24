@@ -1,11 +1,15 @@
+from functools import lru_cache
 from pathlib import Path
 
-from pydantic import BaseSettings
+from pydantic import BaseSettings, Field
+
+BASE_DIR = Path(__file__).resolve().parent
 
 
 class Config(BaseSettings):
     class Config:
         case_sensitive = False
+        env_file = str(BASE_DIR / ".env")
 
 
 class LogConfig(Config):
@@ -29,9 +33,10 @@ class ServiceConfig(Config):
                                      "kion_train",
                                      "interactions.csv")
     log_config: LogConfig
-    model: str = "first"
+    model: list = ["first"]
+    secret_token: str = Field(None, env="SECRET_TOKEN")
 
-
+@lru_cache()
 def get_config() -> Config:
     return ServiceConfig(
         log_config=LogConfig(),

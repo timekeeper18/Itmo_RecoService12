@@ -1,8 +1,6 @@
-from os import environ
 from random import sample
 from typing import List
 
-from dotenv import load_dotenv
 from fastapi import APIRouter, FastAPI, Request, Depends, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.security.api_key import APIKeyQuery, APIKeyHeader, APIKey
@@ -11,8 +9,7 @@ from pydantic import BaseModel
 from service.api.exceptions import UserNotFoundError, ModelNotFoundError, \
     NotAuthorizedError
 from service.log import app_logger
-
-load_dotenv()
+from service.settings import ServiceConfig, get_config
 
 
 class RecoResponse(BaseModel):
@@ -21,13 +18,8 @@ class RecoResponse(BaseModel):
 
 
 router = APIRouter()
-SECRET_TOKEN = environ.get("SECRET_TOKEN")
-API_KEY_NAME = "SECRET_TOKEN"
 
-if SECRET_TOKEN is None:
-    raise Exception(
-        "API_KEY is not set. "
-        "You can set it in .env file or in the environment variables.")
+API_KEY_NAME = "SECRET_TOKEN"
 
 api_key_query = APIKeyQuery(name=API_KEY_NAME, auto_error=False)
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
@@ -38,7 +30,10 @@ async def get_api_key(
     api_key_query: str = Security(api_key_query),
     api_key_header: str = Security(api_key_header),
     token: HTTPAuthorizationCredentials = Security(token_bearer),
+    config: ServiceConfig = Depends(get_config)
 ):
+    SECRET_TOKEN = config.secret_token
+
     if api_key_query == SECRET_TOKEN:
         return api_key_query
     elif api_key_header == SECRET_TOKEN:
@@ -74,7 +69,7 @@ async def get_reco(
     app_logger.info(f"Request for model: {model_name}, user_id: {user_id}")
 
     # проверка на существование модели, если нет - выдать ошибку
-    if model_name != request.app.state.model:
+    if model_name not in request.app.state.model:
         raise ModelNotFoundError(error_message=f"Model {model_name} not found")
 
     # проверка допустимости пользователя, если нет - ошибка
@@ -88,7 +83,7 @@ async def get_reco(
     k_recs = request.app.state.k_recs
 
     # формируем массив с рекомендациями
-    rec = items[items.index == user_id]["item_id"].values
+    rec = items[items["user_id"] == user_id]["item_id"].values
     # проверяем на пустой результат
     if len(rec) == 0:
         rec = sample(item_list, k=k_recs)
