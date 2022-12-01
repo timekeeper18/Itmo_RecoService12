@@ -10,6 +10,7 @@ from service.api.exceptions import UserNotFoundError, ModelNotFoundError, \
     NotAuthorizedError
 from service.log import app_logger
 from service.settings import ServiceConfig, get_config
+from ..make_reco import KionReco
 
 
 class RecoResponse(BaseModel):
@@ -17,6 +18,9 @@ class RecoResponse(BaseModel):
     items: List[int]
 
 
+sfg = Depends(get_config)
+lightfm_0077652 = KionReco(r"/media/akhmadiev/528807968807782D/Develop/PycharmProjects/Itmo_RecoService12/service/models/LightFM_0.077652.dill",
+                           r"/media/akhmadiev/528807968807782D/Develop/PycharmProjects/Itmo_RecoService12/service/data/dataset_LightFM_0.077652.dill")
 router = APIRouter()
 
 API_KEY_NAME = "SECRET_TOKEN"
@@ -42,6 +46,23 @@ async def get_api_key(
         return token.credentials
 
     raise NotAuthorizedError()
+
+
+def make_reco_first(items_, item_list_, user_id_, k_recs_=10) -> list:
+    """
+    Формируем рекомендации для модели под названием first
+    """
+    # формируем массив с рекомендациями
+    rec = items_[items_["user_id"] == user_id_]["item_id"].values
+    # проверяем на пустой результат
+    if len(rec) == 0:
+        rec = sample(item_list_, k=k_recs_)
+    else:
+        rec = rec[0][:k_recs_]
+        if len(rec) < k_recs_:
+            rec.extend(
+                sample(list(set(item_list_) - set(rec)), k=k_recs_ - len(rec)))
+    return rec
 
 
 @router.get(
@@ -75,24 +96,26 @@ async def get_reco(
     # проверка допустимости пользователя, если нет - ошибка
     if user_id > 10 ** 9:
         raise UserNotFoundError(error_message=f"User {user_id} not found")
-
-    # получаем данные по пользователям и позициям из настроек
-    items = request.app.state.items
-    item_list = request.app.state.item_list
     # получаем данные по количеству позиций в выдаче
     k_recs = request.app.state.k_recs
 
-    # формируем массив с рекомендациями
-    rec = items[items["user_id"] == user_id]["item_id"].values
-    # проверяем на пустой результат
-    if len(rec) == 0:
-        rec = sample(item_list, k=k_recs)
-    else:
-        rec = rec[0][:k_recs]
-        if len(rec) < k_recs:
-            rec.extend(
-                sample(list(set(item_list) - set(rec)), k=k_recs - len(rec)))
-    return RecoResponse(user_id=user_id, items=rec)
+    # обрабатываем запрос к модели first
+    if model_name == 'first':
+        # получаем данные по пользователям и позициям из настроек
+        items = request.app.state.items
+        item_list = request.app.state.item_list
+        rec = make_reco_first(items_=items,
+                              item_list_=item_list,
+                              user_id_=user_id,
+                              k_recs_=k_recs)
+        return RecoResponse(user_id=user_id, items=rec)
+
+    # обрабатываем запрос к модели lightfm_0.077652
+    elif model_name == 'lightfm_0.078294':
+        return RecoResponse(user_id=user_id,
+                            items=list(lightfm_0077652.reco(
+                                user_id=user_id,
+                                k_recos=k_recs)))
 
 
 def add_views(app: FastAPI) -> None:
