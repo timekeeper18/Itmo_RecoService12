@@ -29,6 +29,10 @@ class KionReco:
             [Columns.Item]].value_counts().reset_index()[Columns.Item].values
 
     def check_user(self, user_id) -> bool:
+        """
+        Проверка холодного пользователя
+        :param user_id: идентификатор пользователя
+        """
         return user_id in self.users
 
     def reco_recommend(self, user_id, k_recos=10) -> np.ndarray:
