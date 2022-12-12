@@ -14,24 +14,22 @@ class KionReco:
     """
 
     def __init__(self, model_name_, dataset_):
-        assert Path(
-            model_name_).is_file()  # проверка на наличие файла с моделью
-        assert Path(
-            dataset_).is_file()  # проверка на наличие файла с датасетом
+        # проверка на наличие файла с моделью
+        assert Path(model_name_).is_file()
+        # проверка на наличие файла с датасетом
+        assert Path(dataset_).is_file()
         # подгружаем модель
         with open(Path(model_name_), 'rb') as f:
             self.model = dill.load(f)
         # подгружаем датасет
         with open(Path(dataset_), 'rb') as f:
             self.dataset = dill.load(f)
-
+        self.users = self.dataset.interactions.df['user_id'].unique()
         self.sorted_top = self.dataset.interactions.df[
             [Columns.Item]].value_counts().reset_index()[Columns.Item].values
 
     def check_user(self, user_id) -> bool:
-        return False if len(np.where(
-            self.dataset.user_id_map.external_ids == user_id)[0]) == 0 \
-            else True
+        return user_id in self.users
 
     def reco_recommend(self, user_id, k_recos=10) -> np.ndarray:
         """
@@ -42,15 +40,12 @@ class KionReco:
         """
         if self.check_user(user_id):
             # рекомендации для теплого пользователя (который попал в обучение)
-            df_recos = self.model.recommend(
-                users=[user_id],
-                dataset=self.dataset,
-                k=k_recos,
-                filter_viewed=True
-            )
+            df_recos = self.model.recommend(users=[user_id],
+                                            dataset=self.dataset,
+                                            k=k_recos,
+                                            filter_viewed=True)
             return df_recos[Columns.Item].values
-        else:
-            return self.sorted_top[:k_recos]
+        return self.sorted_top[:k_recos]
 
     def reco(self, user_id, k_recos=10) -> np.ndarray:
         """
@@ -61,15 +56,12 @@ class KionReco:
         """
         if self.check_user(user_id):
             # рекомендации для теплого пользователя (который попал в обучение)
-            df_recos = self.model.predict(
-                users=[user_id],
-                dataset=self.dataset,
-                k=k_recos,
-                filter_viewed=True
-            )
+            df_recos = self.model.predict(users=[user_id],
+                                          dataset=self.dataset,
+                                          k=k_recos,
+                                          filter_viewed=True)
             return df_recos
-        else:
-            return self.sorted_top[:k_recos]
+        return self.sorted_top[:k_recos]
 
 
 class KionRecoBM25(KionReco):
@@ -109,13 +101,9 @@ class KionRecoBM25(KionReco):
         return _recs_mapper
 
     def make_reco_slow(self, user_id, k_recos=10) -> np.ndarray:
-        recs = pd.DataFrame({
-            'user_id': self.dataset.interactions.df[
-                self.dataset.interactions.df['user_id'] == user_id][
-                'user_id'].unique()
-        })
-        recs['similar_user_id'], recs['similarity'] = zip(
-            *recs['user_id'].map(self.mapper))
+        interact = self.dataset.interactions.df
+        recs = pd.DataFrame({'user_id': interact[interact['user_id'] == user_id]['user_id'].unique()})
+        recs['similar_user_id'], recs['similarity'] = zip(*recs['user_id'].map(self.mapper))
 
         # explode lists to get vertical representation
         recs = recs.set_index('user_id').apply(pd.Series.explode).reset_index()
@@ -130,50 +118,46 @@ class KionRecoBM25(KionReco):
         # drop duplicates pairs user_id-item_id
         # keep with the largest similiarity
         recs = recs.sort_values(['user_id', 'similarity'], ascending=False)
-        recs = recs \
-            .merge(
-            self.idf[['index', 'idf']],
-            left_on='item_id',
-            right_on='index',
-            how='left') \
-            .drop(['index'], axis=1)
+        recs = recs.merge(self.idf[['index', 'idf']], left_on='item_id',
+                          right_on='index', how='left').drop(['index'], axis=1)
+
         recs['rank_idf'] = recs['similarity'] * recs['idf']
         recs = recs.sort_values(['user_id', 'rank_idf'], ascending=False)
         recs['rank'] = recs.groupby('user_id').cumcount() + 1
         return recs[recs['rank'] <= k_recos]['item_id'].values
 
     def make_reco(self, user_id, k_recos=10):
-        try:
-            recss = {}
-            # находим близких пользователей
-            recss['similar_user_id'], recss['similarity'] = self.mapper(user_id)
+        recss = {}
+        # находим близких пользователей
+        recss['similar_user_id'], recss['similarity'] = self.mapper(user_id)
 
-            # удаляем самого себя
-            recss['similar_user_id'] = recss['similar_user_id'][1:]
-            recss['similarity'] = recss['similarity'][1:]
+        # удаляем самого себя
+        recss['similar_user_id'] = recss['similar_user_id'][1:]
+        recss['similarity'] = recss['similarity'][1:]
 
-            # извлекаем просмотренные фильмы близких пользователей
-            recss['item_id'] = [self.watched.get(f"{x}") for x in
-                                recss['similar_user_id']]
+        # извлекаем просмотренные фильмы близких пользователей
+        recss['item_id'] = [self.watched.get(f"{x}") for x in
+                            recss['similar_user_id']]
 
-            # объединяем с idf
-            recss = pd.DataFrame(recss).explode('item_id').sort_values(
-                ['similarity'], ascending=False)
-            recss = recss.merge(self.idf[['index', 'idf']],
-                                left_on='item_id',
-                                right_on='index',
-                                how='left').drop(['index'], axis=1)
-            recss['rank_idf'] = recss['similarity'] * recss['idf']
-            recss = recss.sort_values(['rank_idf'], ascending=False)
-            recss.dropna(inplace=True)
-            recos = recss['item_id'].unique()[:k_recos]
+        # объединяем с idf
+        recss = pd.DataFrame(recss).explode('item_id').sort_values(
+            ['similarity'], ascending=False)
+        recss = recss.merge(self.idf[['index', 'idf']],
+                            left_on='item_id',
+                            right_on='index',
+                            how='left').drop(['index'], axis=1)
 
-            # если рекомендаций меньше
-            if len(recos) < k_recos:
-                recos = pd.DataFrame(np.append(recos, self.sorted_top),
-                                     columns=['recos'])['recos'].unique()[:k_recos]
-        except:
-            recos = self.sorted_top[:k_recos]
+        recss['rank_idf'] = recss['similarity'] * recss['idf']
+        recss = recss.sort_values(['rank_idf'], ascending=False)
+        recss.dropna(inplace=True)
+        recos = recss['item_id'].unique()[:k_recos]
+
+        # если рекомендаций меньше
+        if len(recos) < k_recos:
+            recos = pd.DataFrame(np.append(recos, self.sorted_top),
+                                 columns=['recos'])['recos'].unique()[:k_recos]
+
+        recos = self.sorted_top[:k_recos]
         return recos
 
     def reco(self, user_id, k_recos=10) -> np.ndarray:
@@ -187,5 +171,4 @@ class KionRecoBM25(KionReco):
             # рекомендации для теплого пользователя (который попал в обучение)
             df_recos = self.make_reco(user_id, k_recos)
             return df_recos
-        else:
-            return self.sorted_top[:k_recos]
+        return self.sorted_top[:k_recos]
