@@ -18,17 +18,24 @@ class KionReco:
         assert Path(model_name_).is_file()
         # проверка на наличие файла с датасетом
         assert Path(dataset_).is_file()
+
         # подгружаем модель
         with open(Path(model_name_), 'rb') as f:
             self.model = dill.load(f)
+
         # подгружаем датасет
         with open(Path(dataset_), 'rb') as f:
             self.dataset = dill.load(f)
+
         self.users = self.dataset.interactions.df['user_id'].unique()
         self.sorted_top = self.dataset.interactions.df[
             [Columns.Item]].value_counts().reset_index()[Columns.Item].values
 
     def check_user(self, user_id) -> bool:
+        """
+        Проверка холодного пользователя
+        :param user_id: идентификатор пользователя
+        """
         return user_id in self.users
 
     def reco_recommend(self, user_id, k_recos=10) -> np.ndarray:
