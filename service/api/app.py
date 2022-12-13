@@ -38,7 +38,7 @@ def create_app(config: ServiceConfig) -> FastAPI:
     app.state.k_recs = config.k_recs
     app.state.items_path = config.items_path
     # Импортируем из конфига наименование модели
-    app.state.model = config.model
+    app.state.models = config.models
     # поднимаем и подготавливаем данные
     a = pd.read_csv(config.items_path)[["user_id", "item_id"]]
     app.state.item_list = list(a["item_id"].unique())

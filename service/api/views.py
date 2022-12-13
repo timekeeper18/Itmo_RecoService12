@@ -10,7 +10,6 @@ from service.api.exceptions import UserNotFoundError, ModelNotFoundError, \
     NotAuthorizedError
 from service.log import app_logger
 from service.settings import ServiceConfig, get_config
-from ..make_reco import KionReco
 
 
 class RecoResponse(BaseModel):
@@ -19,8 +18,6 @@ class RecoResponse(BaseModel):
 
 
 sfg = Depends(get_config)
-lightfm_0077652 = KionReco(r"/media/akhmadiev/528807968807782D/Develop/PycharmProjects/Itmo_RecoService12/service/models/LightFM_0.077652.dill",
-                           r"/media/akhmadiev/528807968807782D/Develop/PycharmProjects/Itmo_RecoService12/service/data/dataset_LightFM_0.077652.dill")
 router = APIRouter()
 
 API_KEY_NAME = "SECRET_TOKEN"
@@ -90,7 +87,7 @@ async def get_reco(
     app_logger.info(f"Request for model: {model_name}, user_id: {user_id}")
 
     # проверка на существование модели, если нет - выдать ошибку
-    if model_name not in request.app.state.model:
+    if model_name not in request.app.state.models:
         raise ModelNotFoundError(error_message=f"Model {model_name} not found")
 
     # проверка допустимости пользователя, если нет - ошибка
@@ -110,10 +107,11 @@ async def get_reco(
                               k_recs_=k_recs)
         return RecoResponse(user_id=user_id, items=rec)
 
-    # обрабатываем запрос к модели lightfm_0.077652
-    elif model_name == 'lightfm_0.078294':
+    # обрабатываем запрос к моделям
+    else:
+        model = request.app.state.models.get(model_name)
         return RecoResponse(user_id=user_id,
-                            items=list(lightfm_0077652.reco(
+                            items=list(model.reco(
                                 user_id=user_id,
                                 k_recos=k_recs)))
 

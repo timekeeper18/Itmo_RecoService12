@@ -3,6 +3,8 @@ from pathlib import Path
 
 from pydantic import BaseSettings, Field
 
+from .make_reco import KionReco, KionRecoBM25
+
 BASE_DIR = Path(__file__).resolve().parent
 
 
@@ -32,14 +34,27 @@ class ServiceConfig(Config):
     items_path = Path.cwd().joinpath("service", "data", "kion_train",
                                      "kion_train",
                                      "interactions.csv")
-
-    dataset_path = Path.cwd().joinpath("service", "data",
-                                       "dataset_LightFM_0.078294.dill")
-    lightfm_path = Path.cwd().joinpath("service", "models",
-                                       "LightFM_0.078294.dill")
+    models = {
+        "LightFM_0.078294": KionReco(Path.cwd().joinpath("service", "models",
+                                                         "LightFM_0.078294.dill"),
+                                     Path.cwd().joinpath("service",
+                                                         "data",
+                                                         "dataset_LightFM_0.078294.dill")),
+        "BM25Recommender_0.085430": KionReco(
+            Path.cwd().joinpath("service", "models",
+                                "BM25Recommender_0.095432.dill"),
+            Path.cwd().joinpath("service",
+                                "data",
+                                "dataset_BM25Recommender_0.095432.dill")),
+        "userknn_BM25Recommender": KionRecoBM25(
+            Path.cwd().joinpath("service", "models",
+                                "userknn_BM25Recommender.dill"),
+            Path.cwd().joinpath("service",
+                                "data",
+                                "dataset_userknn_BM25Recommender.dill"))}
     log_config: LogConfig
-    model: list = ["first", "lightfm_0.078294"]
     secret_token: str = Field(None, env="SECRET_TOKEN")
+
 
 @lru_cache()
 def get_config() -> Config:
