@@ -32,8 +32,13 @@ class ServiceConfig(Config):
     items_path = Path.cwd().joinpath("service", "data", "kion_train",
                                      "kion_train",
                                      "interactions.csv")
+
+    dataset_path = Path.cwd().joinpath("service", "data",
+                                       "dataset_LightFM_0.078294.dill")
+    lightfm_path = Path.cwd().joinpath("service", "models",
+                                       "LightFM_0.078294.dill")
     log_config: LogConfig
-    model: list = ["first"]
+    model: list = ["first", "lightfm_0.078294"]
     secret_token: str = Field(None, env="SECRET_TOKEN")
 
 @lru_cache()

@@ -10,6 +10,7 @@ from .exception_handlers import add_exception_handlers
 from .middlewares import add_middlewares
 from .views import add_views
 from ..log import app_logger, setup_logging
+from ..make_reco import KionReco
 from ..settings import ServiceConfig
 
 __all__ = ("create_app",)
@@ -43,6 +44,10 @@ def create_app(config: ServiceConfig) -> FastAPI:
     app.state.item_list = list(a["item_id"].unique())
     app.state.items = a.groupby("user_id").agg(
         {"item_id": lambda x: sorted(list(x))}).reset_index()
+
+    # инициализируем класс с рекомендациями
+    # app.state.lightfm_0077652 = KionReco(config.lightfm_path,
+    #                                      config.dataset_path)
 
     add_views(app)
     add_middlewares(app)
