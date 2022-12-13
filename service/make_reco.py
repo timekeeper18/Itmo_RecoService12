@@ -14,38 +14,24 @@ class KionReco:
     """
 
     def __init__(self, model_name_, dataset_):
-        # проверка на наличие файла с моделью
-        assert Path(model_name_).is_file()
-        # проверка на наличие файла с датасетом
-        assert Path(dataset_).is_file()
+        # проверка на наличие файла с моделью и датасетом
+        if not Path(model_name_).is_file():
+            raise FileNotFoundError(f"{model_name_} not found")
+
+        if not Path(dataset_).is_file():
+            raise FileNotFoundError(f"{dataset_} not found")
         # подгружаем модель
         with open(Path(model_name_), 'rb') as f:
             self.model = dill.load(f)
         # подгружаем датасет
         with open(Path(dataset_), 'rb') as f:
             self.dataset = dill.load(f)
-        self.users = self.dataset.interactions.df['user_id'].unique()
+        self.users = set(self.dataset.interactions.df['user_id'].unique())
         self.sorted_top = self.dataset.interactions.df[
             [Columns.Item]].value_counts().reset_index()[Columns.Item].values
 
     def check_user(self, user_id) -> bool:
         return user_id in self.users
-
-    def reco_recommend(self, user_id, k_recos=10) -> np.ndarray:
-        """
-        Получение К рекомендаций для пользователя
-        :param user_id: идентификатор пользователя
-        :param k_recos: количество рекомендаций
-        :return:
-        """
-        if self.check_user(user_id):
-            # рекомендации для теплого пользователя (который попал в обучение)
-            df_recos = self.model.recommend(users=[user_id],
-                                            dataset=self.dataset,
-                                            k=k_recos,
-                                            filter_viewed=True)
-            return df_recos[Columns.Item].values
-        return self.sorted_top[:k_recos]
 
     def reco(self, user_id, k_recos=10) -> np.ndarray:
         """
@@ -71,8 +57,7 @@ class KionRecoBM25(KionReco):
         self.idf = pd.DataFrame.from_dict(cnt, orient='index',
                                           columns=['doc_freq']).reset_index()
         n = self.dataset.interactions.df.shape[0]
-        self.idf['idf'] = self.idf['doc_freq'].apply(
-            lambda x: np.log((1 + n) / (1 + x) + 1))
+        self.idf['idf'] = self.idf['doc_freq'].apply(lambda x: np.log((1 + n)/(1 + x) + 1))
 
         self.users_inv_mapping = dict(
             enumerate(self.dataset.interactions.df['user_id'].unique()))
@@ -156,8 +141,6 @@ class KionRecoBM25(KionReco):
         if len(recos) < k_recos:
             recos = pd.DataFrame(np.append(recos, self.sorted_top),
                                  columns=['recos'])['recos'].unique()[:k_recos]
-
-        recos = self.sorted_top[:k_recos]
         return recos
 
     def reco(self, user_id, k_recos=10) -> np.ndarray:
