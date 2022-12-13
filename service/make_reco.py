@@ -14,10 +14,12 @@ class KionReco:
     """
 
     def __init__(self, model_name_, dataset_):
-        # проверка на наличие файла с моделью
-        assert Path(model_name_).is_file()
-        # проверка на наличие файла с датасетом
-        assert Path(dataset_).is_file()
+        # проверка на наличие файла с моделью и датасетом
+        if not Path(model_name_).is_file():
+            raise FileNotFoundError(f"{model_name_} not found")
+
+        if not Path(dataset_).is_file():
+            raise FileNotFoundError(f"{dataset_} not found")
         # подгружаем модель
         with open(Path(model_name_), 'rb') as f:
             self.model = dill.load(f)
